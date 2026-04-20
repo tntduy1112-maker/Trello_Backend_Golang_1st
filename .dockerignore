@@ -1,0 +1,81 @@
+# ============================================
+# Docker Ignore — TaskFlow
+# ============================================
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Environment files (use docker secrets in production)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+bin/
+dist/
+build/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Coverage
+coverage.out
+coverage.html
+*.cover
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test fixtures
+testdata/
+fixtures/
+
+# Claude config (development only)
+.claude/
+
+# Frontend (if in same repo)
+Frontend/
+frontend/
+node_modules/
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.docker/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Makefile
+
+# Scripts (not needed in runtime)
+scripts/
+
+# Temp files
+tmp/
+temp/
+*.tmp

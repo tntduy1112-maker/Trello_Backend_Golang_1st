@@ -1,0 +1,136 @@
+# ============================================
+# TaskFlow — Git Ignore
+# ============================================
+
+# ==========================================
+# Environment & Secrets
+# ==========================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+secrets/
+
+# ==========================================
+# Claude local settings
+# ==========================================
+.claude/settings.local.json
+.claude/CLAUDE.local.md
+
+# ==========================================
+# Go
+# ==========================================
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go build
+*.out
+
+# Vendor directory (if not committing)
+# vendor/
+
+# Go workspace
+go.work
+go.work.sum
+
+# ==========================================
+# Frontend / Node.js
+# ==========================================
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# ==========================================
+# Docker
+# ==========================================
+# Ignore local docker overrides
+docker-compose.override.yml
+docker-compose.local.yml
+
+# SSL certificates (generate locally)
+nginx/ssl/
+
+# ==========================================
+# Logs
+# ==========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build-errors.log
+
+# ==========================================
+# Testing & Coverage
+# ==========================================
+coverage/
+coverage.out
+coverage.html
+.nyc_output/
+*.cover
+testdata/output/
+
+# ==========================================
+# IDE & Editors
+# ==========================================
+.vscode/settings.json
+.vscode/*.code-workspace
+.idea/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# OS Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ==========================================
+# Temporary Files
+# ==========================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# ==========================================
+# Air (Go live reload)
+# ==========================================
+tmp/
+
+# ==========================================
+# Database dumps
+# ==========================================
+*.sql.gz
+*.dump
+backups/
+
+# ==========================================
+# MinIO local data (if not using Docker volume)
+# ==========================================
+minio-data/
