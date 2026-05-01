@@ -66,7 +66,7 @@ migrate:
 
 migrate-new:
 	@if [ -z "$(NAME)" ]; then echo "Usage: make migrate-new NAME=migration_name"; exit 1; fi
-	goose -dir migrations create $(NAME) sql
+	goose -dir Backend/migrations create $(NAME) sql
 
 migrate-down:
 	docker compose exec api /app/server migrate down
@@ -82,25 +82,25 @@ redis-cli:
 # ==========================================
 
 build:
-	go build -o bin/server ./cmd/server
+	cd Backend && go build -o bin/server ./cmd/server
 
 test:
-	go test -v ./...
+	cd Backend && go test -v ./...
 
 test-cover:
-	go test -cover -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: coverage.html"
+	cd Backend && go test -cover -coverprofile=coverage.out ./...
+	cd Backend && go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: Backend/coverage.html"
 
 test-race:
-	go test -race ./...
+	cd Backend && go test -race ./...
 
 lint:
-	golangci-lint run ./...
+	cd Backend && golangci-lint run ./...
 
 fmt:
-	go fmt ./...
-	goimports -w .
+	cd Backend && go fmt ./...
+	cd Backend && goimports -w .
 
 # ==========================================
 # Docker
@@ -110,7 +110,7 @@ VERSION ?= latest
 REGISTRY ?= ghcr.io/your-org
 
 docker-build:
-	docker build -t trello-agent-api:$(VERSION) .
+	docker build -t trello-agent-api:$(VERSION) ./Backend
 
 docker-push:
 	docker tag trello-agent-api:$(VERSION) $(REGISTRY)/trello-agent-api:$(VERSION)
@@ -125,7 +125,7 @@ docker-prod:
 
 clean:
 	docker compose down -v --remove-orphans
-	rm -rf bin/ coverage.out coverage.html
+	rm -rf Backend/bin/ Backend/coverage.out Backend/coverage.html
 
 clean-all: clean
 	docker system prune -af
@@ -137,7 +137,7 @@ clean-all: clean
 
 # Generate API docs
 docs:
-	swag init -g cmd/server/main.go -o docs/swagger
+	cd Backend && swag init -g cmd/server/main.go -o docs/swagger
 
 # Generate sqlc code
 sqlc:
@@ -153,4 +153,4 @@ tools:
 
 # Watch mode for development (requires air)
 watch:
-	air -c .air.toml
+	cd Backend && air -c .air.toml

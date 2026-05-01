@@ -107,7 +107,7 @@ services:
   # ==========================================
   api:
     build:
-      context: .
+      context: ./Backend
       dockerfile: Dockerfile
     container_name: trello-agent-api
     restart: unless-stopped
