@@ -1,0 +1,1687 @@
+openapi: 3.0.3
+info:
+  title: TaskFlow API
+  description: |
+    TaskFlow is a collaborative project management application inspired by Trello.
+
+    ## Authentication
+    Most endpoints require authentication via JWT Bearer token.
+    1. Register or Login to get access and refresh tokens
+    2. Include the access token in the `Authorization` header: `Bearer <token>`
+    3. Use the refresh token to get new access tokens when they expire
+
+    ## Rate Limiting
+    Some endpoints have rate limits to prevent abuse:
+    - Register: 3 requests per hour
+    - Login: 50 requests per 15 minutes
+    - Forgot Password: 5 requests per 15 minutes
+
+    ## Response Format
+    All responses follow this format:
+    ```json
+    {
+      "success": true,
+      "data": { ... },
+      "message": "Optional message"
+    }
+    ```
+
+    Error responses:
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "ERROR_CODE",
+        "message": "Human readable message"
+      }
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: TaskFlow Support
+    url: https://github.com/tntduy1112-maker/Trello_Backend_Golang_1st/issues
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+  - url: https://api.taskflow.com/api/v1
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and account management
+  - name: Organizations
+    description: Workspace/Organization management
+  - name: Boards
+    description: Board management
+  - name: Lists
+    description: List management within boards
+  - name: Cards
+    description: Card management within lists
+  - name: Labels
+    description: Label management for cards
+  - name: Comments
+    description: Comments on cards
+  - name: Checklists
+    description: Checklist management for cards
+  - name: Attachments
+    description: File attachments for cards
+  - name: Notifications
+    description: User notifications
+  - name: Invitations
+    description: Board invitations
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid input data
+
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: clx1234567890
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        full_name:
+          type: string
+          example: John Doe
+        avatar_url:
+          type: string
+          nullable: true
+        email_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuthTokens:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Access token expiry in seconds
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - full_name
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        full_name:
+          type: string
+          minLength: 2
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+        owner_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Board:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        background_color:
+          type: string
+          example: "#0079bf"
+        is_closed:
+          type: boolean
+        organization_id:
+          type: string
+        my_role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        lists:
+          type: array
+          items:
+            $ref: '#/components/schemas/List'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardMember'
+
+    BoardMember:
+      type: object
+      properties:
+        id:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        joined_at:
+          type: string
+          format: date-time
+
+    List:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        position:
+          type: number
+        is_archived:
+          type: boolean
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Card'
+
+    Card:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        position:
+          type: number
+        list_id:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        priority:
+          type: string
+          enum: [none, low, medium, high]
+        is_completed:
+          type: boolean
+        is_archived:
+          type: boolean
+        cover_url:
+          type: string
+          nullable: true
+        assignee:
+          $ref: '#/components/schemas/User'
+        reporter:
+          $ref: '#/components/schemas/User'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+        created_at:
+          type: string
+          format: date-time
+
+    Label:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+          example: "#61bd4f"
+        board_id:
+          type: string
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        card_id:
+          type: string
+        author:
+          $ref: '#/components/schemas/User'
+        parent_id:
+          type: string
+          nullable: true
+        is_edited:
+          type: boolean
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        created_at:
+          type: string
+          format: date-time
+
+    Checklist:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        card_id:
+          type: string
+        position:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChecklistItem'
+
+    ChecklistItem:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        is_checked:
+          type: boolean
+        position:
+          type: number
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        file_url:
+          type: string
+        file_size:
+          type: integer
+        mime_type:
+          type: string
+        is_cover:
+          type: boolean
+        uploaded_by:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [mentioned, comment_added, comment_reply, card_assigned, card_due_soon, card_overdue, board_invitation, member_added_to_board]
+        title:
+          type: string
+        message:
+          type: string
+        is_read:
+          type: boolean
+        card_id:
+          type: string
+          nullable: true
+        board_id:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        status:
+          type: string
+          enum: [pending, accepted, declined, expired]
+        board:
+          $ref: '#/components/schemas/Board'
+        inviter:
+          $ref: '#/components/schemas/User'
+        expires_at:
+          type: string
+          format: date-time
+
+paths:
+  # ============ Authentication ============
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Create a new user account. A verification email will be sent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+                  message:
+                    type: string
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login
+      description: Authenticate with email and password to receive JWT tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      tokens:
+                        $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Get a new access token using a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid or expired refresh token
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout
+      description: Invalidate the current refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user
+      description: Get the authenticated user's profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+    put:
+      tags: [Authentication]
+      summary: Update current user
+      description: Update the authenticated user's profile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  /auth/verify-email:
+    post:
+      tags: [Authentication]
+      summary: Verify email
+      description: Verify email address using the token sent via email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Forgot password
+      description: Request a password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Reset email sent (if email exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset password
+      description: Reset password using the token from email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  # ============ Organizations ============
+  /organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      description: Get all organizations the user belongs to
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+    post:
+      tags: [Organizations]
+      summary: Create organization
+      description: Create a new organization/workspace
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Organization'
+
+  /organizations/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Organizations]
+      summary: Get organization
+      description: Get organization by slug
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Organization'
+    put:
+      tags: [Organizations]
+      summary: Update organization
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Organization updated
+    delete:
+      tags: [Organizations]
+      summary: Delete organization
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Organization deleted
+
+  /organizations/{slug}/boards:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Organizations]
+      summary: List boards in organization
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of boards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Board'
+    post:
+      tags: [Organizations]
+      summary: Create board in organization
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                background_color:
+                  type: string
+                  example: "#0079bf"
+      responses:
+        '201':
+          description: Board created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Board'
+
+  # ============ Boards ============
+  /boards/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Boards]
+      summary: Get board
+      description: Get board with lists, cards, labels, and members
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Board details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Board'
+    put:
+      tags: [Boards]
+      summary: Update board
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                background_color:
+                  type: string
+      responses:
+        '200':
+          description: Board updated
+    delete:
+      tags: [Boards]
+      summary: Delete board
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Board deleted
+
+  /boards/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Boards]
+      summary: List board members
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BoardMember'
+    post:
+      tags: [Boards]
+      summary: Invite member to board
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [admin, member, viewer]
+      responses:
+        '200':
+          description: Invitation sent
+
+  /boards/{id}/lists:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Lists]
+      summary: Create list in board
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+      responses:
+        '201':
+          description: List created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/List'
+
+  /boards/{id}/labels:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Labels]
+      summary: List labels in board
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of labels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Label'
+    post:
+      tags: [Labels]
+      summary: Create label in board
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - color
+              properties:
+                name:
+                  type: string
+                color:
+                  type: string
+                  example: "#61bd4f"
+      responses:
+        '201':
+          description: Label created
+
+  # ============ Lists ============
+  /lists/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags: [Lists]
+      summary: Update list
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+      responses:
+        '200':
+          description: List updated
+
+  /lists/{id}/archive:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Lists]
+      summary: Archive list
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List archived
+
+  /lists/{id}/move:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Lists]
+      summary: Move list
+      description: Change list position
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - position
+              properties:
+                position:
+                  type: number
+      responses:
+        '200':
+          description: List moved
+
+  /lists/{id}/cards:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Cards]
+      summary: Create card in list
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+      responses:
+        '201':
+          description: Card created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Card'
+
+  # ============ Cards ============
+  /cards/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Cards]
+      summary: Get card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Card details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Card'
+    put:
+      tags: [Cards]
+      summary: Update card
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                due_date:
+                  type: string
+                  format: date-time
+                priority:
+                  type: string
+                  enum: [none, low, medium, high]
+      responses:
+        '200':
+          description: Card updated
+
+  /cards/{id}/move:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Cards]
+      summary: Move card
+      description: Move card to different list or position
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - list_id
+                - position
+              properties:
+                list_id:
+                  type: string
+                position:
+                  type: number
+      responses:
+        '200':
+          description: Card moved
+
+  /cards/{id}/assign:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Cards]
+      summary: Assign card
+      description: Assign card to a board member
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+              properties:
+                user_id:
+                  type: string
+      responses:
+        '200':
+          description: Card assigned
+
+  /cards/{id}/labels/{labelId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: labelId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Cards]
+      summary: Add label to card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Label added
+    delete:
+      tags: [Cards]
+      summary: Remove label from card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Label removed
+
+  # ============ Comments ============
+  /cards/{id}/comments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Comments]
+      summary: List comments on card
+      description: Get all comments with threaded replies, newest first
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+    post:
+      tags: [Comments]
+      summary: Add comment to card
+      description: |
+        Add a comment. Use @[Name](userId) format for mentions.
+        Mentioned users will receive notifications.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  example: "Hey @[John](clx123) can you review this?"
+                parent_id:
+                  type: string
+                  description: For replies, the parent comment ID
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Comment'
+
+  /comments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags: [Comments]
+      summary: Update comment
+      description: Update your own comment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Comment updated
+    delete:
+      tags: [Comments]
+      summary: Delete comment
+      description: Delete your own comment
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Comment deleted
+
+  # ============ Checklists ============
+  /cards/{id}/checklists:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Checklists]
+      summary: List checklists on card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of checklists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Checklist'
+    post:
+      tags: [Checklists]
+      summary: Create checklist on card
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+      responses:
+        '201':
+          description: Checklist created
+
+  /checklists/{id}/items:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Checklists]
+      summary: Add item to checklist
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Item created
+
+  /checklist-items/{id}/toggle:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Checklists]
+      summary: Toggle checklist item
+      description: Check/uncheck a checklist item
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Item toggled
+
+  # ============ Attachments ============
+  /cards/{id}/attachments:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Attachments]
+      summary: List attachments on card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of attachments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
+    post:
+      tags: [Attachments]
+      summary: Upload attachment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: File uploaded
+
+  /attachments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Attachments]
+      summary: Delete attachment
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Attachment deleted
+
+  /attachments/{id}/download:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Attachments]
+      summary: Download attachment
+      security:
+        - BearerAuth: []
+      responses:
+        '302':
+          description: Redirect to file URL
+
+  # ============ Notifications ============
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Get user notifications, newest first
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+
+  /notifications/stream:
+    get:
+      tags: [Notifications]
+      summary: Notification stream (SSE)
+      description: |
+        Server-Sent Events stream for real-time notifications.
+        Connect with EventSource to receive live updates.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /notifications/{id}/read:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Notifications]
+      summary: Mark notification as read
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Marked as read
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All marked as read
+
+  # ============ Invitations ============
+  /invitations/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Invitations]
+      summary: Get invitation details
+      description: Get invitation details by token (public endpoint)
+      responses:
+        '200':
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+
+  /invitations/{token}/accept:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Invitations]
+      summary: Accept invitation
+      description: Accept board invitation (requires authentication)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Invitation accepted
+
+  /invitations/{token}/accept-with-password:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Invitations]
+      summary: Accept invitation with account creation
+      description: For new users - create account and accept invitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - full_name
+                - password
+              properties:
+                full_name:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Account created and invitation accepted

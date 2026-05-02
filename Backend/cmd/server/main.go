@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,6 +25,9 @@ import (
 	"github.com/codewebkhongkho/trello-agent/pkg/jwt"
 	"github.com/codewebkhongkho/trello-agent/pkg/storage"
 )
+
+//go:embed swagger.yaml
+var swaggerYAML []byte
 
 var Version = "dev"
 
@@ -173,6 +177,15 @@ func main() {
 			"version": Version,
 		})
 	})
+
+	// Swagger API Documentation
+	swaggerHandler := handler.NewSwaggerHandler(swaggerYAML)
+	docs := r.Group("/api/docs")
+	{
+		docs.GET("", swaggerHandler.ServeUI)
+		docs.GET("/", swaggerHandler.ServeUI)
+		docs.GET("/swagger.yaml", swaggerHandler.ServeYAML)
+	}
 
 	api := r.Group("/api/v1")
 	{
