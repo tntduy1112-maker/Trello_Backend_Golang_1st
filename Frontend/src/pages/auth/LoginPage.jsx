@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { login, clearError } from '../../redux/slices/authSlice';
 
 export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isLoading, error } = useSelector((state) => state.auth);
+  const redirectTo = searchParams.get('redirect') || '/home';
 
   const [formData, setFormData] = useState({
     email: '',
@@ -23,7 +25,7 @@ export default function LoginPage() {
     e.preventDefault();
     const result = await dispatch(login(formData));
     if (login.fulfilled.match(result)) {
-      navigate('/home');
+      navigate(redirectTo);
     }
   };
 

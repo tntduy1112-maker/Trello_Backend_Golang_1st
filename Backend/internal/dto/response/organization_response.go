@@ -16,16 +16,17 @@ type OrganizationSummary struct {
 }
 
 type OrganizationDetail struct {
-	ID           string         `json:"id"`
-	Name         string         `json:"name"`
-	Slug         string         `json:"slug"`
-	Description  *string        `json:"description,omitempty"`
-	LogoURL      *string        `json:"logo_url,omitempty"`
-	Owner        *UserSummary   `json:"owner"`
-	MembersCount int            `json:"members_count"`
-	BoardsCount  int            `json:"boards_count"`
-	MyRole       domain.OrgRole `json:"my_role"`
-	CreatedAt    time.Time      `json:"created_at"`
+	ID               string         `json:"id"`
+	Name             string         `json:"name"`
+	Slug             string         `json:"slug"`
+	Description      *string        `json:"description,omitempty"`
+	LogoURL          *string        `json:"logo_url,omitempty"`
+	Owner            *UserSummary   `json:"owner"`
+	MembersCount     int            `json:"members_count"`
+	BoardsCount      int            `json:"boards_count"`
+	MyRole           domain.OrgRole `json:"my_role"`
+	IsWorkspaceOwner bool           `json:"is_workspace_owner"`
+	CreatedAt        time.Time      `json:"created_at"`
 }
 
 type UserSummary struct {
@@ -64,4 +65,16 @@ func ToOrgMemberResponse(member *domain.OrganizationMember) *OrgMemberResponse {
 		Role:     member.Role,
 		JoinedAt: member.JoinedAt,
 	}
+}
+
+type BoardAccess struct {
+	ID           string           `json:"id"`
+	Title        string           `json:"title"`
+	Role         domain.BoardRole `json:"role"`
+	MembershipID string           `json:"membership_id"`
+}
+
+type BoardMemberWithBoards struct {
+	User   *UserSummary  `json:"user"`
+	Boards []BoardAccess `json:"boards"`
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/codewebkhongkho/trello-agent/pkg/database"
 	"github.com/codewebkhongkho/trello-agent/pkg/email"
 	"github.com/codewebkhongkho/trello-agent/pkg/jwt"
+	"github.com/codewebkhongkho/trello-agent/pkg/storage"
 )
 
 var Version = "dev"
@@ -58,6 +59,31 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewTokenRepository(db)
 	verificationRepo := repository.NewVerificationRepository(db)
+	orgRepo := repository.NewOrganizationRepository(db)
+	boardRepo := repository.NewBoardRepository(db)
+	invRepo := repository.NewInvitationRepository(db)
+	listRepo := repository.NewListRepository(db)
+	cardRepo := repository.NewCardRepository(db)
+	labelRepo := repository.NewLabelRepository(db)
+	commentRepo := repository.NewCommentRepository(db)
+	checklistRepo := repository.NewChecklistRepository(db)
+	attachmentRepo := repository.NewAttachmentRepository(db)
+	activityRepo := repository.NewActivityRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
+
+	// Initialize MinIO storage
+	storageService, err := storage.NewMinioStorage(storage.MinioConfig{
+		Endpoint:   cfg.MinIO.Endpoint,
+		AccessKey:  cfg.MinIO.AccessKey,
+		SecretKey:  cfg.MinIO.SecretKey,
+		Bucket:     cfg.MinIO.Bucket,
+		UseSSL:     cfg.MinIO.UseSSL,
+		PublicHost: cfg.MinIO.PublicHost,
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to MinIO")
+	}
+	log.Info().Msg("Connected to MinIO")
 
 	jwtManager := jwt.NewManager(jwt.Config{
 		AccessSecret:     cfg.JWT.AccessSecret,
@@ -89,7 +115,43 @@ func main() {
 		FrontendURL:      frontendURL,
 	})
 
+	orgService := service.NewOrganizationService(orgRepo, userRepo, boardRepo)
+
+	boardService := service.NewBoardService(service.BoardServiceConfig{
+		BoardRepo:   boardRepo,
+		OrgRepo:     orgRepo,
+		InvRepo:     invRepo,
+		UserRepo:    userRepo,
+		ListRepo:    listRepo,
+		LabelRepo:   labelRepo,
+		EmailSvc:    emailService,
+		FrontendURL: frontendURL,
+	})
+
+	sseManager := service.NewSSEManager()
+	notificationService := service.NewNotificationService(notificationRepo, sseManager)
+
+	activityService := service.NewActivityService(activityRepo, cardRepo, boardRepo)
+	listService := service.NewListService(listRepo, boardRepo, cardRepo)
+	cardService := service.NewCardService(cardRepo, listRepo, boardRepo, labelRepo, userRepo, notificationService, activityService)
+	labelService := service.NewLabelService(labelRepo, boardRepo, cardRepo)
+	commentService := service.NewCommentService(commentRepo, cardRepo, boardRepo, activityRepo, userRepo, notificationService)
+	checklistService := service.NewChecklistService(checklistRepo, cardRepo, boardRepo, activityRepo)
+	attachmentService := service.NewAttachmentService(attachmentRepo, cardRepo, boardRepo, activityRepo, storageService)
+	invitationService := service.NewInvitationService(invRepo, boardRepo, userRepo, orgRepo, jwtManager)
+
 	authHandler := handler.NewAuthHandler(authService)
+	orgHandler := handler.NewOrganizationHandler(orgService)
+	boardHandler := handler.NewBoardHandler(boardService)
+	listHandler := handler.NewListHandler(listService)
+	cardHandler := handler.NewCardHandler(cardService)
+	labelHandler := handler.NewLabelHandler(labelService)
+	commentHandler := handler.NewCommentHandler(commentService)
+	checklistHandler := handler.NewChecklistHandler(checklistService)
+	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
+	activityHandler := handler.NewActivityHandler(activityService)
+	notificationHandler := handler.NewNotificationHandler(notificationService, sseManager)
+	invitationHandler := handler.NewInvitationHandler(invitationService)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -145,7 +207,7 @@ func main() {
 
 			auth.POST("/login",
 				middleware.RateLimit(redisClient, middleware.RateLimitConfig{
-					MaxRequests: 5,
+					MaxRequests: 50,
 					Window:      15 * time.Minute,
 					KeyPrefix:   "login",
 				}),
@@ -195,6 +257,145 @@ func main() {
 				middleware.Auth(jwtManager, authService),
 				authHandler.UpdateMe,
 			)
+		}
+
+		// Public invitation endpoints (no auth required)
+		api.GET("/invitations/:token", invitationHandler.GetByToken)
+		api.POST("/invitations/:token/accept-with-password", invitationHandler.AcceptWithPassword)
+
+		protected := api.Group("")
+		protected.Use(middleware.Auth(jwtManager, authService))
+		{
+			// Protected invitation endpoints
+			invitations := protected.Group("/invitations")
+			{
+				invitations.POST("/:token/accept", invitationHandler.Accept)
+				invitations.POST("/:token/decline", invitationHandler.Decline)
+			}
+
+			orgs := protected.Group("/organizations")
+			{
+				orgs.POST("", orgHandler.Create)
+				orgs.GET("", orgHandler.List)
+				orgs.GET("/:slug", orgHandler.GetBySlug)
+				orgs.PUT("/:slug", orgHandler.Update)
+				orgs.DELETE("/:slug", orgHandler.Delete)
+				orgs.GET("/:slug/members", orgHandler.ListMembers)
+				orgs.GET("/:slug/board-members", orgHandler.ListBoardMembers)
+				orgs.PUT("/:slug/boards/:boardId/members/:userId", orgHandler.UpdateBoardMemberRole)
+				orgs.POST("/:slug/members", orgHandler.InviteMember)
+				orgs.PUT("/:slug/members/:userId", orgHandler.UpdateMemberRole)
+				orgs.DELETE("/:slug/members/:userId", orgHandler.RemoveMember)
+				orgs.POST("/:slug/leave", orgHandler.Leave)
+
+				orgs.POST("/:slug/boards", boardHandler.Create)
+				orgs.GET("/:slug/boards", boardHandler.ListByOrg)
+			}
+
+			boards := protected.Group("/boards")
+			{
+				boards.GET("/:id", boardHandler.GetByID)
+				boards.PUT("/:id", boardHandler.Update)
+				boards.DELETE("/:id", boardHandler.Delete)
+				boards.POST("/:id/close", boardHandler.Close)
+				boards.POST("/:id/reopen", boardHandler.Reopen)
+				boards.GET("/:id/members", boardHandler.ListMembers)
+				boards.POST("/:id/members", boardHandler.Invite)
+				boards.PUT("/:id/members/:userId", boardHandler.UpdateMemberRole)
+				boards.DELETE("/:id/members/:userId", boardHandler.RemoveMember)
+				boards.POST("/:id/leave", boardHandler.Leave)
+				boards.GET("/:id/invitations", boardHandler.ListInvitations)
+				boards.DELETE("/:id/invitations/:invitationId", boardHandler.RevokeInvitation)
+
+				boards.POST("/:id/lists", listHandler.Create)
+				boards.GET("/:id/labels", labelHandler.ListByBoard)
+				boards.POST("/:id/labels", labelHandler.Create)
+				boards.GET("/:id/activity", activityHandler.ListByBoard)
+			}
+
+			lists := protected.Group("/lists")
+			{
+				lists.PUT("/:id", listHandler.Update)
+				lists.POST("/:id/archive", listHandler.Archive)
+				lists.POST("/:id/restore", listHandler.Restore)
+				lists.POST("/:id/move", listHandler.Move)
+				lists.POST("/:id/copy", listHandler.Copy)
+				lists.POST("/:id/cards", cardHandler.Create)
+			}
+
+			cards := protected.Group("/cards")
+			{
+				cards.GET("/:id", cardHandler.GetByID)
+				cards.PUT("/:id", cardHandler.Update)
+				cards.POST("/:id/archive", cardHandler.Archive)
+				cards.POST("/:id/restore", cardHandler.Restore)
+				cards.POST("/:id/move", cardHandler.Move)
+				cards.POST("/:id/assign", cardHandler.Assign)
+				cards.POST("/:id/unassign", cardHandler.Unassign)
+				cards.POST("/:id/complete", cardHandler.MarkComplete)
+				cards.POST("/:id/incomplete", cardHandler.MarkIncomplete)
+				cards.POST("/:id/labels/:labelId", labelHandler.AssignToCard)
+				cards.DELETE("/:id/labels/:labelId", labelHandler.RemoveFromCard)
+
+				// Comments
+				cards.GET("/:id/comments", commentHandler.List)
+				cards.POST("/:id/comments", commentHandler.Create)
+
+				// Checklists
+				cards.GET("/:id/checklists", checklistHandler.List)
+				cards.POST("/:id/checklists", checklistHandler.Create)
+
+				// Attachments
+				cards.GET("/:id/attachments", attachmentHandler.List)
+				cards.POST("/:id/attachments", attachmentHandler.Upload)
+				cards.DELETE("/:id/cover", attachmentHandler.RemoveCover)
+
+				// Activity
+				cards.GET("/:id/activity", activityHandler.ListByCard)
+			}
+
+			labels := protected.Group("/labels")
+			{
+				labels.PUT("/:id", labelHandler.Update)
+				labels.DELETE("/:id", labelHandler.Delete)
+			}
+
+			comments := protected.Group("/comments")
+			{
+				comments.PUT("/:id", commentHandler.Update)
+				comments.DELETE("/:id", commentHandler.Delete)
+			}
+
+			checklists := protected.Group("/checklists")
+			{
+				checklists.PUT("/:id", checklistHandler.Update)
+				checklists.DELETE("/:id", checklistHandler.Delete)
+				checklists.POST("/:id/items", checklistHandler.CreateItem)
+			}
+
+			checklistItems := protected.Group("/checklist-items")
+			{
+				checklistItems.PUT("/:id", checklistHandler.UpdateItem)
+				checklistItems.DELETE("/:id", checklistHandler.DeleteItem)
+				checklistItems.POST("/:id/toggle", checklistHandler.ToggleItem)
+			}
+
+			attachments := protected.Group("/attachments")
+			{
+				attachments.DELETE("/:id", attachmentHandler.Delete)
+				attachments.POST("/:id/cover", attachmentHandler.SetCover)
+				attachments.GET("/:id/download", attachmentHandler.Download)
+			}
+
+			notifications := protected.Group("/notifications")
+			{
+				notifications.GET("", notificationHandler.List)
+				notifications.GET("/unread-count", notificationHandler.GetUnreadCount)
+				notifications.GET("/stream", notificationHandler.Stream)
+				notifications.POST("/:id/read", notificationHandler.MarkAsRead)
+				notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
+				notifications.DELETE("/:id", notificationHandler.Delete)
+			}
 		}
 	}
 

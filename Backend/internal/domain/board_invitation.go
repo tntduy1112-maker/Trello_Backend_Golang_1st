@@ -47,4 +47,4 @@ func (i *BoardInvitation) IsPending() bool {
 	return i.Status == InvitationPending && !i.IsExpired()
 }
 
-const InvitationExpiresIn = 7 * 24 * time.Hour
+const InvitationExpiresIn = 3 * 24 * time.Hour

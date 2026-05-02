@@ -66,11 +66,12 @@ type JWTConfig struct {
 }
 
 type MinIOConfig struct {
-	Endpoint  string
-	AccessKey string
-	SecretKey string
-	Bucket    string
-	UseSSL    bool
+	Endpoint   string
+	AccessKey  string
+	SecretKey  string
+	Bucket     string
+	UseSSL     bool
+	PublicHost string
 }
 
 type SMTPConfig struct {
@@ -122,11 +123,12 @@ func Load() (*Config, error) {
 			RefreshExpiresIn: viper.GetDuration("JWT_REFRESH_EXPIRES_IN"),
 		},
 		MinIO: MinIOConfig{
-			Endpoint:  viper.GetString("MINIO_ENDPOINT"),
-			AccessKey: viper.GetString("MINIO_ACCESS_KEY"),
-			SecretKey: viper.GetString("MINIO_SECRET_KEY"),
-			Bucket:    viper.GetString("MINIO_BUCKET"),
-			UseSSL:    viper.GetBool("MINIO_USE_SSL"),
+			Endpoint:   viper.GetString("MINIO_ENDPOINT"),
+			AccessKey:  viper.GetString("MINIO_ACCESS_KEY"),
+			SecretKey:  viper.GetString("MINIO_SECRET_KEY"),
+			Bucket:     viper.GetString("MINIO_BUCKET"),
+			UseSSL:     viper.GetBool("MINIO_USE_SSL"),
+			PublicHost: viper.GetString("MINIO_PUBLIC_HOST"),
 		},
 		SMTP: SMTPConfig{
 			Host: viper.GetString("SMTP_HOST"),

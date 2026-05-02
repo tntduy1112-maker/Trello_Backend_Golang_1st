@@ -36,3 +36,8 @@ type UpdateProfileRequest struct {
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
+type AcceptInvitationWithPasswordRequest struct {
+	FullName string `json:"full_name" binding:"required,min=2,max=255"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
+}

@@ -5,9 +5,13 @@ const listService = {
 
   update: (listId, data) => axiosInstance.put(`/lists/${listId}`, data),
 
-  move: (listId, position) => axiosInstance.put(`/lists/${listId}/move`, { position }),
+  archive: (listId) => axiosInstance.post(`/lists/${listId}/archive`),
 
-  archive: (listId) => axiosInstance.delete(`/lists/${listId}`),
+  restore: (listId) => axiosInstance.post(`/lists/${listId}/restore`),
+
+  move: (listId, position) => axiosInstance.post(`/lists/${listId}/move`, { position }),
+
+  copy: (listId, title) => axiosInstance.post(`/lists/${listId}/copy`, { title }),
 };
 
 export default listService;

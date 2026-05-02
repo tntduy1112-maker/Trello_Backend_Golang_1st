@@ -27,7 +27,17 @@ type BoardDetail struct {
 	MyRole          domain.BoardRole       `json:"my_role"`
 	Organization    *OrgSummary            `json:"organization"`
 	Members         []*BoardMemberResponse `json:"members"`
+	Lists           []*ListWithCards       `json:"lists"`
+	Labels          []*LabelSummary        `json:"labels"`
 	CreatedAt       time.Time              `json:"created_at"`
+}
+
+type ListWithCards struct {
+	ID         string        `json:"id"`
+	Title      string        `json:"title"`
+	Position   float64       `json:"position"`
+	CardsCount int           `json:"cards_count"`
+	Cards      []CardSummary `json:"cards"`
 }
 
 type OrgSummary struct {
@@ -53,6 +63,9 @@ type InvitationResponse struct {
 	Status       domain.InvitationStatus `json:"status"`
 	ExpiresAt    time.Time               `json:"expires_at"`
 	CreatedAt    time.Time               `json:"created_at"`
+	Token        string                  `json:"token,omitempty"`
+	InviteURL    string                  `json:"invite_url,omitempty"`
+	IsNewUser    bool                    `json:"is_new_user"`
 }
 
 type BoardSummaryForInvite struct {
@@ -73,6 +86,10 @@ func ToBoardMemberResponse(member *domain.BoardMember) *BoardMemberResponse {
 }
 
 func ToInvitationResponse(inv *domain.BoardInvitation) *InvitationResponse {
+	return ToInvitationResponseWithURL(inv, "")
+}
+
+func ToInvitationResponseWithURL(inv *domain.BoardInvitation, frontendURL string) *InvitationResponse {
 	if inv == nil {
 		return nil
 	}
@@ -84,6 +101,10 @@ func ToInvitationResponse(inv *domain.BoardInvitation) *InvitationResponse {
 		Status:       inv.Status,
 		ExpiresAt:    inv.ExpiresAt,
 		CreatedAt:    inv.CreatedAt,
+		Token:        inv.Token,
+	}
+	if frontendURL != "" && inv.Token != "" {
+		resp.InviteURL = frontendURL + "/invite/" + inv.Token
 	}
 	if inv.Board != nil {
 		resp.Board = &BoardSummaryForInvite{

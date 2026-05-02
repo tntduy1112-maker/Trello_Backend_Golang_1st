@@ -1,8 +1,11 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import { useNotificationStream } from '../../hooks/useNotificationStream';
 
 export default function AppLayout() {
+  useNotificationStream();
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />

@@ -24,10 +24,12 @@ type BoardRepository interface {
 	AddMember(ctx context.Context, member *domain.BoardMember) error
 	FindMember(ctx context.Context, boardID, userID string) (*domain.BoardMember, error)
 	FindMembers(ctx context.Context, boardID string) ([]*domain.BoardMember, error)
+	FindMembersByOrgID(ctx context.Context, orgID string) ([]*domain.BoardMember, error)
 	UpdateMemberRole(ctx context.Context, boardID, userID string, role domain.BoardRole) error
 	RemoveMember(ctx context.Context, boardID, userID string) error
 
 	CanUserAccess(ctx context.Context, boardID, userID string) (bool, domain.BoardRole, error)
+	IsWorkspaceOwner(ctx context.Context, orgID, userID string) (bool, error)
 	CountLists(ctx context.Context, boardID string) (int, error)
 	CountCards(ctx context.Context, boardID string) (int, error)
 }
@@ -228,6 +230,42 @@ func (r *boardRepository) FindMembers(ctx context.Context, boardID string) ([]*d
 	return members, rows.Err()
 }
 
+func (r *boardRepository) FindMembersByOrgID(ctx context.Context, orgID string) ([]*domain.BoardMember, error) {
+	query := `
+		SELECT bm.id, bm.board_id, bm.user_id, bm.role, bm.joined_at,
+		       u.id, u.email, u.full_name, u.avatar_url,
+		       b.id, b.title
+		FROM board_members bm
+		INNER JOIN users u ON bm.user_id = u.id
+		INNER JOIN boards b ON bm.board_id = b.id
+		WHERE b.organization_id = $1 AND b.deleted_at IS NULL
+		ORDER BY u.full_name, b.title
+	`
+	rows, err := r.db.Query(ctx, query, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []*domain.BoardMember
+	for rows.Next() {
+		var member domain.BoardMember
+		var user domain.User
+		var board domain.Board
+		if err := rows.Scan(
+			&member.ID, &member.BoardID, &member.UserID, &member.Role, &member.JoinedAt,
+			&user.ID, &user.Email, &user.FullName, &user.AvatarURL,
+			&board.ID, &board.Title,
+		); err != nil {
+			return nil, err
+		}
+		member.User = &user
+		member.Board = &board
+		members = append(members, &member)
+	}
+	return members, rows.Err()
+}
+
 func (r *boardRepository) UpdateMemberRole(ctx context.Context, boardID, userID string, role domain.BoardRole) error {
 	query := `UPDATE board_members SET role = $3 WHERE board_id = $1 AND user_id = $2`
 	_, err := r.db.Exec(ctx, query, boardID, userID, role)
@@ -241,6 +279,7 @@ func (r *boardRepository) RemoveMember(ctx context.Context, boardID, userID stri
 }
 
 func (r *boardRepository) CanUserAccess(ctx context.Context, boardID, userID string) (bool, domain.BoardRole, error) {
+	// Board-centric model: only explicit board members have access
 	member, err := r.FindMember(ctx, boardID, userID)
 	if err != nil {
 		return false, "", err
@@ -249,35 +288,26 @@ func (r *boardRepository) CanUserAccess(ctx context.Context, boardID, userID str
 		return true, member.Role, nil
 	}
 
-	board, err := r.FindByID(ctx, boardID)
-	if err != nil {
-		return false, "", err
-	}
-	if board == nil {
-		return false, "", nil
-	}
-
-	if board.Visibility == domain.VisibilityPublic {
-		return true, domain.BoardRoleViewer, nil
-	}
-
-	if board.Visibility == domain.VisibilityWorkspace {
-		query := `
-			SELECT EXISTS(
-				SELECT 1 FROM organization_members
-				WHERE organization_id = $1 AND user_id = $2
-			)
-		`
-		var exists bool
-		if err := r.db.QueryRow(ctx, query, board.OrganizationID, userID).Scan(&exists); err != nil {
-			return false, "", err
-		}
-		if exists {
-			return true, domain.BoardRoleMember, nil
-		}
-	}
-
+	// No access if not a board member
 	return false, "", nil
+}
+
+func (r *boardRepository) IsWorkspaceOwner(ctx context.Context, orgID, userID string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM board_members bm
+			INNER JOIN boards b ON bm.board_id = b.id
+			WHERE b.organization_id = $1
+			AND bm.user_id = $2
+			AND bm.role = 'owner'
+			AND b.deleted_at IS NULL
+		)
+	`
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, orgID, userID).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (r *boardRepository) CountLists(ctx context.Context, boardID string) (int, error) {

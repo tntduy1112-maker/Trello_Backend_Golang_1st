@@ -14,7 +14,7 @@ export const fetchWorkspaces = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await workspaceService.getAll();
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch workspaces' });
     }
@@ -26,7 +26,7 @@ export const fetchWorkspace = createAsyncThunk(
   async (slug, { rejectWithValue }) => {
     try {
       const response = await workspaceService.getBySlug(slug);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch workspace' });
     }
@@ -38,7 +38,7 @@ export const createWorkspace = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const response = await workspaceService.create(data);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to create workspace' });
     }
@@ -50,7 +50,7 @@ export const updateWorkspace = createAsyncThunk(
   async ({ slug, data }, { rejectWithValue }) => {
     try {
       const response = await workspaceService.update(slug, data);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to update workspace' });
     }
@@ -74,7 +74,7 @@ export const fetchWorkspaceMembers = createAsyncThunk(
   async (slug, { rejectWithValue }) => {
     try {
       const response = await workspaceService.getMembers(slug);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch members' });
     }
@@ -86,7 +86,7 @@ export const inviteMember = createAsyncThunk(
   async ({ slug, email, role }, { rejectWithValue }) => {
     try {
       const response = await workspaceService.inviteMember(slug, email, role);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to invite member' });
     }

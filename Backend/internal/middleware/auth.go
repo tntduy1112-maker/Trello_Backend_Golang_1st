@@ -21,20 +21,24 @@ const (
 
 func Auth(jwtManager *jwt.Manager, authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenString string
+
+		// Check Authorization header first
 		authHeader := c.GetHeader(AuthorizationHeader)
-		if authHeader == "" {
+		if authHeader != "" && strings.HasPrefix(authHeader, BearerPrefix) {
+			tokenString = strings.TrimPrefix(authHeader, BearerPrefix)
+		}
+
+		// Fallback to query parameter (for SSE/EventSource)
+		if tokenString == "" {
+			tokenString = c.Query("token")
+		}
+
+		if tokenString == "" {
 			response.ErrorResponse(c, apperror.ErrUnauthorized)
 			c.Abort()
 			return
 		}
-
-		if !strings.HasPrefix(authHeader, BearerPrefix) {
-			response.ErrorResponse(c, apperror.ErrUnauthorized)
-			c.Abort()
-			return
-		}
-
-		tokenString := strings.TrimPrefix(authHeader, BearerPrefix)
 		claims, err := jwtManager.ValidateAccessToken(tokenString)
 		if err != nil {
 			if err == jwt.ErrTokenExpired {

@@ -226,6 +226,47 @@ func (h *BoardHandler) Invite(c *gin.Context) {
 	response.Success(c, http.StatusCreated, inv)
 }
 
+func (h *BoardHandler) ListInvitations(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		response.ErrorResponse(c, apperror.ErrUnauthorized)
+		return
+	}
+
+	boardID := c.Param("id")
+	invitations, err := h.boardService.ListInvitations(c.Request.Context(), userID, boardID)
+	if err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			response.ErrorResponse(c, appErr)
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, invitations)
+}
+
+func (h *BoardHandler) RevokeInvitation(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		response.ErrorResponse(c, apperror.ErrUnauthorized)
+		return
+	}
+
+	invitationID := c.Param("invitationId")
+	if err := h.boardService.RevokeInvitation(c.Request.Context(), userID, invitationID); err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			response.ErrorResponse(c, appErr)
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	response.SuccessMessage(c, http.StatusOK, "Invitation revoked")
+}
+
 func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == "" {

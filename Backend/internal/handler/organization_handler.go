@@ -155,6 +155,54 @@ func (h *OrganizationHandler) ListMembers(c *gin.Context) {
 	response.Success(c, http.StatusOK, members)
 }
 
+func (h *OrganizationHandler) InviteMember(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		response.ErrorResponse(c, apperror.ErrUnauthorized)
+		return
+	}
+
+	slug := c.Param("slug")
+	var req request.InviteOrgMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	member, err := h.orgService.InviteMember(c.Request.Context(), userID, slug, &req)
+	if err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			response.ErrorResponse(c, appErr)
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusCreated, member)
+}
+
+func (h *OrganizationHandler) ListBoardMembers(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		response.ErrorResponse(c, apperror.ErrUnauthorized)
+		return
+	}
+
+	slug := c.Param("slug")
+	boardMembers, err := h.orgService.ListBoardMembers(c.Request.Context(), userID, slug)
+	if err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			response.ErrorResponse(c, appErr)
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, boardMembers)
+}
+
 func (h *OrganizationHandler) UpdateMemberRole(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -223,4 +271,33 @@ func (h *OrganizationHandler) Leave(c *gin.Context) {
 	}
 
 	response.SuccessMessage(c, http.StatusOK, "Left organization successfully")
+}
+
+func (h *OrganizationHandler) UpdateBoardMemberRole(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		response.ErrorResponse(c, apperror.ErrUnauthorized)
+		return
+	}
+
+	slug := c.Param("slug")
+	boardID := c.Param("boardId")
+	targetUserID := c.Param("userId")
+
+	var req request.UpdateBoardMemberRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.orgService.UpdateBoardMemberRole(c.Request.Context(), userID, slug, boardID, targetUserID, req.Role); err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			response.ErrorResponse(c, appErr)
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	response.SuccessMessage(c, http.StatusOK, "Board member role updated successfully")
 }

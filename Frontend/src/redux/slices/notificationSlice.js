@@ -13,7 +13,7 @@ export const fetchNotifications = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await notificationService.getAll();
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch notifications' });
     }
@@ -25,7 +25,7 @@ export const fetchUnreadCount = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await notificationService.getUnreadCount();
-      return response.data.count;
+      return response.data.data.count;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch unread count' });
     }

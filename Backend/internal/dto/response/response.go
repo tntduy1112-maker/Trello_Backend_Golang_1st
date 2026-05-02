@@ -64,3 +64,20 @@ func Paginated(c *gin.Context, statusCode int, data any, pagination *Pagination)
 		Pagination: pagination,
 	})
 }
+
+func SuccessPaginated(c *gin.Context, statusCode int, data any, page, limit, total int) {
+	totalPages := total / limit
+	if total%limit > 0 {
+		totalPages++
+	}
+	c.JSON(statusCode, PaginatedResponse{
+		Success: true,
+		Data:    data,
+		Pagination: &Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+	})
+}

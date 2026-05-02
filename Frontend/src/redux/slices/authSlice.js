@@ -13,8 +13,9 @@ export const login = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await authService.login(credentials);
-      localStorage.setItem('accessToken', response.data.access_token);
-      return response.data;
+      const data = response.data.data;
+      localStorage.setItem('accessToken', data.access_token);
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Login failed' });
     }
@@ -26,7 +27,7 @@ export const register = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       const response = await authService.register(userData);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Registration failed' });
     }
@@ -50,7 +51,7 @@ export const getCurrentUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await authService.getCurrentUser();
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to get user' });
     }
@@ -105,6 +106,12 @@ const authSlice = createSlice({
       state.user = action.payload;
       state.isAuthenticated = !!action.payload;
     },
+    setCredentials: (state, action) => {
+      state.user = action.payload.user;
+      state.isAuthenticated = true;
+      state.isLoading = false;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -152,5 +159,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUser } = authSlice.actions;
+export const { clearError, setUser, setCredentials } = authSlice.actions;
 export default authSlice.reducer;

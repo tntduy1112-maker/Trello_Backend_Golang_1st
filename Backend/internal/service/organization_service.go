@@ -11,12 +11,13 @@ import (
 )
 
 type OrganizationService struct {
-	orgRepo  repository.OrganizationRepository
-	userRepo repository.UserRepository
+	orgRepo   repository.OrganizationRepository
+	userRepo  repository.UserRepository
+	boardRepo repository.BoardRepository
 }
 
-func NewOrganizationService(orgRepo repository.OrganizationRepository, userRepo repository.UserRepository) *OrganizationService {
-	return &OrganizationService{orgRepo: orgRepo, userRepo: userRepo}
+func NewOrganizationService(orgRepo repository.OrganizationRepository, userRepo repository.UserRepository, boardRepo repository.BoardRepository) *OrganizationService {
+	return &OrganizationService{orgRepo: orgRepo, userRepo: userRepo, boardRepo: boardRepo}
 }
 
 func (s *OrganizationService) Create(ctx context.Context, userID string, req *request.CreateOrganizationRequest) (*response.OrganizationDetail, error) {
@@ -103,18 +104,20 @@ func (s *OrganizationService) GetBySlug(ctx context.Context, userID, slug string
 	owner, _ := s.userRepo.FindByID(ctx, org.OwnerID)
 	membersCount, _ := s.orgRepo.CountMembers(ctx, org.ID)
 	boardsCount, _ := s.orgRepo.CountBoards(ctx, org.ID)
+	isWorkspaceOwner, _ := s.boardRepo.IsWorkspaceOwner(ctx, org.ID, userID)
 
 	return &response.OrganizationDetail{
-		ID:           org.ID,
-		Name:         org.Name,
-		Slug:         org.Slug,
-		Description:  org.Description,
-		LogoURL:      org.LogoURL,
-		Owner:        response.ToUserSummary(owner),
-		MembersCount: membersCount,
-		BoardsCount:  boardsCount,
-		MyRole:       member.Role,
-		CreatedAt:    org.CreatedAt,
+		ID:               org.ID,
+		Name:             org.Name,
+		Slug:             org.Slug,
+		Description:      org.Description,
+		LogoURL:          org.LogoURL,
+		Owner:            response.ToUserSummary(owner),
+		MembersCount:     membersCount,
+		BoardsCount:      boardsCount,
+		MyRole:           member.Role,
+		IsWorkspaceOwner: isWorkspaceOwner,
+		CreatedAt:        org.CreatedAt,
 	}, nil
 }
 
@@ -178,6 +181,45 @@ func (s *OrganizationService) ListMembers(ctx context.Context, userID, slug stri
 	}
 
 	return responses, nil
+}
+
+func (s *OrganizationService) InviteMember(ctx context.Context, userID, slug string, req *request.InviteOrgMemberRequest) (*response.OrgMemberResponse, error) {
+	member, err := s.orgRepo.FindMemberBySlug(ctx, slug, userID)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if member == nil || !member.Role.HasPermission(domain.OrgRoleAdmin) {
+		return nil, apperror.ErrForbidden
+	}
+
+	invitee, err := s.userRepo.FindByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if invitee == nil {
+		return nil, apperror.New("USER_NOT_FOUND", "User with this email not found", 404)
+	}
+
+	org := member.Organization
+	existingMember, err := s.orgRepo.FindMember(ctx, org.ID, invitee.ID)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if existingMember != nil {
+		return nil, apperror.New("ALREADY_MEMBER", "User is already a member of this organization", 409)
+	}
+
+	newMember := &domain.OrganizationMember{
+		OrganizationID: org.ID,
+		UserID:         invitee.ID,
+		Role:           req.Role,
+	}
+	if err := s.orgRepo.AddMember(ctx, newMember); err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+
+	newMember.User = invitee
+	return response.ToOrgMemberResponse(newMember), nil
 }
 
 func (s *OrganizationService) UpdateMemberRole(ctx context.Context, userID, slug, targetUserID string, role domain.OrgRole) error {
@@ -272,4 +314,92 @@ func (s *OrganizationService) Leave(ctx context.Context, userID, slug string) er
 
 func (s *OrganizationService) GetMemberRole(ctx context.Context, slug, userID string) (*domain.OrganizationMember, error) {
 	return s.orgRepo.FindMemberBySlug(ctx, slug, userID)
+}
+
+func (s *OrganizationService) ListBoardMembers(ctx context.Context, userID, slug string) ([]*response.BoardMemberWithBoards, error) {
+	member, err := s.orgRepo.FindMemberBySlug(ctx, slug, userID)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if member == nil {
+		return nil, apperror.ErrForbidden
+	}
+
+	boardMembers, err := s.boardRepo.FindMembersByOrgID(ctx, member.Organization.ID)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+
+	userBoardsMap := make(map[string]*response.BoardMemberWithBoards)
+	for _, bm := range boardMembers {
+		if _, exists := userBoardsMap[bm.UserID]; !exists {
+			userBoardsMap[bm.UserID] = &response.BoardMemberWithBoards{
+				User: &response.UserSummary{
+					ID:        bm.User.ID,
+					Email:     bm.User.Email,
+					FullName:  bm.User.FullName,
+					AvatarURL: bm.User.AvatarURL,
+				},
+				Boards: []response.BoardAccess{},
+			}
+		}
+		userBoardsMap[bm.UserID].Boards = append(userBoardsMap[bm.UserID].Boards, response.BoardAccess{
+			ID:           bm.Board.ID,
+			Title:        bm.Board.Title,
+			Role:         bm.Role,
+			MembershipID: bm.ID,
+		})
+	}
+
+	result := make([]*response.BoardMemberWithBoards, 0, len(userBoardsMap))
+	for _, v := range userBoardsMap {
+		result = append(result, v)
+	}
+
+	return result, nil
+}
+
+func (s *OrganizationService) UpdateBoardMemberRole(ctx context.Context, userID, slug, boardID, targetUserID string, role domain.BoardRole) error {
+	member, err := s.orgRepo.FindMemberBySlug(ctx, slug, userID)
+	if err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if member == nil {
+		return apperror.ErrForbidden
+	}
+
+	isWorkspaceOwner, err := s.boardRepo.IsWorkspaceOwner(ctx, member.Organization.ID, userID)
+	if err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if !isWorkspaceOwner {
+		return apperror.New("NOT_WORKSPACE_OWNER", "Only workspace owners can manage board roles", 403)
+	}
+
+	board, err := s.boardRepo.FindByID(ctx, boardID)
+	if err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if board == nil || board.OrganizationID != member.Organization.ID {
+		return apperror.ErrNotFound
+	}
+
+	targetMember, err := s.boardRepo.FindMember(ctx, boardID, targetUserID)
+	if err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if targetMember == nil {
+		return apperror.ErrNotFound
+	}
+
+	// Prevent owners from demoting themselves
+	if userID == targetUserID && targetMember.Role == domain.BoardRoleOwner && role != domain.BoardRoleOwner {
+		return apperror.New("CANNOT_DEMOTE_SELF", "You cannot demote yourself from owner role", 403)
+	}
+
+	if err := s.boardRepo.UpdateMemberRole(ctx, boardID, targetUserID, role); err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+
+	return nil
 }

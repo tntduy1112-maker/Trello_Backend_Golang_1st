@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { register, clearError } from '../../redux/slices/authSlice';
 
 export default function RegisterPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isLoading, error } = useSelector((state) => state.auth);
+  const redirectTo = searchParams.get('redirect');
+  const prefillEmail = searchParams.get('email') || '';
 
   const [formData, setFormData] = useState({
-    email: '',
+    email: prefillEmail,
     password: '',
     full_name: '',
   });
@@ -24,7 +27,7 @@ export default function RegisterPage() {
     e.preventDefault();
     const result = await dispatch(register(formData));
     if (register.fulfilled.match(result)) {
-      navigate('/verify-email', { state: { email: formData.email } });
+      navigate('/verify-email', { state: { email: formData.email, redirect: redirectTo } });
     }
   };
 

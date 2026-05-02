@@ -39,3 +39,11 @@ type AuthResponse struct {
 type MessageResponse struct {
 	Message string `json:"message"`
 }
+
+type AcceptInvitationResponse struct {
+	User         *UserResponse `json:"user"`
+	AccessToken  string        `json:"access_token"`
+	RefreshToken string        `json:"refresh_token,omitempty"`
+	ExpiresIn    int64         `json:"expires_in"`
+	BoardID      string        `json:"board_id"`
+}

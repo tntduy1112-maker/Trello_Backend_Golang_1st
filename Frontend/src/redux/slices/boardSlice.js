@@ -10,6 +10,7 @@ const initialState = {
   labels: [],
   members: [],
   openCardId: null,
+  cardNavContext: null,
   isLoading: false,
   error: null,
 };
@@ -19,7 +20,7 @@ export const fetchBoards = createAsyncThunk(
   async (workspaceSlug, { rejectWithValue }) => {
     try {
       const response = await boardService.getByWorkspace(workspaceSlug);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch boards' });
     }
@@ -31,7 +32,7 @@ export const fetchBoard = createAsyncThunk(
   async (boardId, { rejectWithValue }) => {
     try {
       const response = await boardService.getById(boardId);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch board' });
     }
@@ -43,7 +44,7 @@ export const createBoard = createAsyncThunk(
   async ({ workspaceSlug, data }, { rejectWithValue }) => {
     try {
       const response = await boardService.create(workspaceSlug, data);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to create board' });
     }
@@ -55,7 +56,7 @@ export const updateBoard = createAsyncThunk(
   async ({ boardId, data }, { rejectWithValue }) => {
     try {
       const response = await boardService.update(boardId, data);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to update board' });
     }
@@ -67,7 +68,7 @@ export const createList = createAsyncThunk(
   async ({ boardId, title }, { rejectWithValue }) => {
     try {
       const response = await listService.create(boardId, title);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to create list' });
     }
@@ -79,7 +80,7 @@ export const updateList = createAsyncThunk(
   async ({ listId, data }, { rejectWithValue }) => {
     try {
       const response = await listService.update(listId, data);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to update list' });
     }
@@ -91,7 +92,7 @@ export const moveList = createAsyncThunk(
   async ({ listId, position }, { rejectWithValue }) => {
     try {
       const response = await listService.move(listId, position);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to move list' });
     }
@@ -115,7 +116,7 @@ export const createCard = createAsyncThunk(
   async ({ listId, title }, { rejectWithValue }) => {
     try {
       const response = await cardService.create(listId, title);
-      return response.data;
+      return { ...response.data.data, list_id: listId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to create card' });
     }
@@ -127,7 +128,7 @@ export const updateCard = createAsyncThunk(
   async ({ cardId, data }, { rejectWithValue }) => {
     try {
       const response = await cardService.update(cardId, data);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to update card' });
     }
@@ -139,7 +140,7 @@ export const moveCard = createAsyncThunk(
   async ({ cardId, listId, position }, { rejectWithValue }) => {
     try {
       const response = await cardService.move(cardId, listId, position);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || { message: 'Failed to move card' });
     }
@@ -158,6 +159,30 @@ export const deleteCard = createAsyncThunk(
   }
 );
 
+export const fetchMembers = createAsyncThunk(
+  'board/fetchMembers',
+  async (boardId, { rejectWithValue }) => {
+    try {
+      const response = await boardService.getMembers(boardId);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.error || { message: 'Failed to fetch members' });
+    }
+  }
+);
+
+export const inviteMember = createAsyncThunk(
+  'board/inviteMember',
+  async ({ boardId, email, role }, { rejectWithValue }) => {
+    try {
+      const response = await boardService.inviteMember(boardId, email, role);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.error || { message: 'Failed to invite member' });
+    }
+  }
+);
+
 const boardSlice = createSlice({
   name: 'board',
   initialState,
@@ -172,7 +197,16 @@ const boardSlice = createSlice({
       state.members = [];
     },
     setOpenCardId: (state, action) => {
-      state.openCardId = action.payload;
+      if (typeof action.payload === 'object' && action.payload !== null) {
+        state.openCardId = action.payload.cardId;
+        state.cardNavContext = action.payload.context || null;
+      } else {
+        state.openCardId = action.payload;
+        state.cardNavContext = null;
+      }
+    },
+    clearCardNavContext: (state) => {
+      state.cardNavContext = null;
     },
     optimisticMoveCard: (state, action) => {
       const { cardId, fromListId, toListId, newPosition } = action.payload;
@@ -230,7 +264,7 @@ const boardSlice = createSlice({
         state.boards.push(action.payload);
       })
       .addCase(createList.fulfilled, (state, action) => {
-        state.lists.push(action.payload);
+        state.lists.push({ ...action.payload, cards: [] });
         state.lists.sort((a, b) => a.position - b.position);
       })
       .addCase(updateList.fulfilled, (state, action) => {
@@ -267,6 +301,14 @@ const boardSlice = createSlice({
             break;
           }
         }
+      })
+      .addCase(fetchMembers.fulfilled, (state, action) => {
+        state.members = action.payload || [];
+      })
+      .addCase(inviteMember.fulfilled, (state, action) => {
+        if (action.payload) {
+          state.members.push(action.payload);
+        }
       });
   },
 });
@@ -275,6 +317,7 @@ export const {
   clearError,
   clearCurrentBoard,
   setOpenCardId,
+  clearCardNavContext,
   optimisticMoveCard,
   optimisticMoveList,
 } = boardSlice.actions;

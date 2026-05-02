@@ -18,7 +18,12 @@ const boardService = {
   getMembers: (boardId) => axiosInstance.get(`/boards/${boardId}/members`),
 
   inviteMember: (boardId, email, role = 'member') =>
-    axiosInstance.post(`/boards/${boardId}/invitations`, { email, role }),
+    axiosInstance.post(`/boards/${boardId}/members`, { email, role }),
+
+  getInvitations: (boardId) => axiosInstance.get(`/boards/${boardId}/invitations`),
+
+  revokeInvitation: (boardId, invitationId) =>
+    axiosInstance.delete(`/boards/${boardId}/invitations/${invitationId}`),
 
   getLabels: (boardId) => axiosInstance.get(`/boards/${boardId}/labels`),
 

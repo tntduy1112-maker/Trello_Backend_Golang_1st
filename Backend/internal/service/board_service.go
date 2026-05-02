@@ -15,11 +15,13 @@ import (
 )
 
 type BoardService struct {
-	boardRepo  repository.BoardRepository
-	orgRepo    repository.OrganizationRepository
-	invRepo    repository.InvitationRepository
-	userRepo   repository.UserRepository
-	emailSvc   *email.Service
+	boardRepo   repository.BoardRepository
+	orgRepo     repository.OrganizationRepository
+	invRepo     repository.InvitationRepository
+	userRepo    repository.UserRepository
+	listRepo    *repository.ListRepository
+	labelRepo   *repository.LabelRepository
+	emailSvc    *email.Service
 	frontendURL string
 }
 
@@ -28,6 +30,8 @@ type BoardServiceConfig struct {
 	OrgRepo     repository.OrganizationRepository
 	InvRepo     repository.InvitationRepository
 	UserRepo    repository.UserRepository
+	ListRepo    *repository.ListRepository
+	LabelRepo   *repository.LabelRepository
 	EmailSvc    *email.Service
 	FrontendURL string
 }
@@ -38,6 +42,8 @@ func NewBoardService(cfg BoardServiceConfig) *BoardService {
 		orgRepo:     cfg.OrgRepo,
 		invRepo:     cfg.InvRepo,
 		userRepo:    cfg.UserRepo,
+		listRepo:    cfg.ListRepo,
+		labelRepo:   cfg.LabelRepo,
 		emailSvc:    cfg.EmailSvc,
 		frontendURL: cfg.FrontendURL,
 	}
@@ -100,11 +106,8 @@ func (s *BoardService) ListByOrg(ctx context.Context, userID, orgSlug string, in
 	summaries := make([]*response.BoardSummary, 0, len(boards))
 	for _, board := range boards {
 		canAccess, role, _ := s.boardRepo.CanUserAccess(ctx, board.ID, userID)
-		if !canAccess && board.Visibility == domain.VisibilityPrivate {
-			continue
-		}
 		if !canAccess {
-			role = domain.BoardRoleMember
+			continue
 		}
 
 		listsCount, _ := s.boardRepo.CountLists(ctx, board.ID)
@@ -157,6 +160,57 @@ func (s *BoardService) GetByID(ctx context.Context, userID, boardID string) (*re
 		}
 	}
 
+	listsWithCards := make([]*response.ListWithCards, 0)
+	if s.listRepo != nil {
+		lists, err := s.listRepo.FindByBoardIDWithCards(ctx, boardID)
+		if err == nil {
+			for _, list := range lists {
+				cards := make([]response.CardSummary, 0, len(list.Cards))
+				for _, card := range list.Cards {
+					var assignee *response.UserSummary
+					if card.Assignee != nil {
+						assignee = &response.UserSummary{
+							ID:        card.Assignee.ID,
+							FullName:  card.Assignee.FullName,
+							AvatarURL: card.Assignee.AvatarURL,
+						}
+					}
+					cards = append(cards, response.CardSummary{
+						ID:          card.ID,
+						Title:       card.Title,
+						Position:    card.Position,
+						Priority:    card.Priority,
+						DueDate:     card.DueDate,
+						IsCompleted: card.IsCompleted,
+						Assignee:    assignee,
+						Labels:      []response.LabelSummary{},
+					})
+				}
+				listsWithCards = append(listsWithCards, &response.ListWithCards{
+					ID:         list.ID,
+					Title:      list.Title,
+					Position:   list.Position,
+					CardsCount: len(list.Cards),
+					Cards:      cards,
+				})
+			}
+		}
+	}
+
+	labels := make([]*response.LabelSummary, 0)
+	if s.labelRepo != nil {
+		boardLabels, err := s.labelRepo.FindByBoardID(ctx, boardID)
+		if err == nil {
+			for _, label := range boardLabels {
+				labels = append(labels, &response.LabelSummary{
+					ID:    label.ID,
+					Name:  label.Name,
+					Color: label.Color,
+				})
+			}
+		}
+	}
+
 	return &response.BoardDetail{
 		ID:              board.ID,
 		Title:           board.Title,
@@ -167,6 +221,8 @@ func (s *BoardService) GetByID(ctx context.Context, userID, boardID string) (*re
 		MyRole:          role,
 		Organization:    orgSummary,
 		Members:         memberResponses,
+		Lists:           listsWithCards,
+		Labels:          labels,
 		CreatedAt:       board.CreatedAt,
 	}, nil
 }
@@ -275,9 +331,13 @@ func (s *BoardService) Invite(ctx context.Context, userID, boardID string, req *
 		return nil, apperror.ErrForbidden
 	}
 
-	existingMember, _ := s.boardRepo.FindMember(ctx, boardID, userID)
-	if existingMember != nil {
-		return nil, apperror.New("ALREADY_MEMBER", "User is already a board member", 409)
+	// Check if invitee is already a member
+	invitee, _ := s.userRepo.FindByEmail(ctx, req.Email)
+	if invitee != nil {
+		existingMember, _ := s.boardRepo.FindMember(ctx, boardID, invitee.ID)
+		if existingMember != nil {
+			return nil, apperror.New("ALREADY_MEMBER", "User is already a board member", 409)
+		}
 	}
 
 	existingInv, _ := s.invRepo.FindByBoardAndEmail(ctx, boardID, req.Email)
@@ -287,7 +347,6 @@ func (s *BoardService) Invite(ctx context.Context, userID, boardID string, req *
 
 	token := generateInviteToken()
 	var inviteeID *string
-	invitee, _ := s.userRepo.FindByEmail(ctx, req.Email)
 	if invitee != nil {
 		inviteeID = &invitee.ID
 	}
@@ -309,7 +368,58 @@ func (s *BoardService) Invite(ctx context.Context, userID, boardID string, req *
 
 	inv, _ = s.invRepo.FindByToken(ctx, token)
 
-	return response.ToInvitationResponse(inv), nil
+	return response.ToInvitationResponseWithURL(inv, s.frontendURL), nil
+}
+
+func (s *BoardService) ListInvitations(ctx context.Context, userID, boardID string) ([]*response.InvitationResponse, error) {
+	canAccess, role, err := s.boardRepo.CanUserAccess(ctx, boardID, userID)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if !canAccess || !role.CanManage() {
+		return nil, apperror.ErrForbidden
+	}
+
+	invitations, err := s.invRepo.FindPendingByBoardID(ctx, boardID)
+	if err != nil {
+		return nil, apperror.Wrap(err, apperror.ErrInternal)
+	}
+
+	responses := make([]*response.InvitationResponse, len(invitations))
+	for i, inv := range invitations {
+		responses[i] = response.ToInvitationResponseWithURL(inv, s.frontendURL)
+	}
+	return responses, nil
+}
+
+func (s *BoardService) RevokeInvitation(ctx context.Context, userID, invitationID string) error {
+	// Get invitation to check board access
+	invitations, err := s.invRepo.FindPendingByBoardID(ctx, "")
+	if err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+
+	var targetInv *domain.BoardInvitation
+	for _, inv := range invitations {
+		if inv.ID == invitationID {
+			targetInv = inv
+			break
+		}
+	}
+
+	if targetInv == nil {
+		return apperror.ErrNotFound
+	}
+
+	canAccess, role, err := s.boardRepo.CanUserAccess(ctx, targetInv.BoardID, userID)
+	if err != nil {
+		return apperror.Wrap(err, apperror.ErrInternal)
+	}
+	if !canAccess || !role.CanManage() {
+		return apperror.ErrForbidden
+	}
+
+	return s.invRepo.Delete(ctx, invitationID)
 }
 
 func (s *BoardService) UpdateMemberRole(ctx context.Context, userID, boardID, targetUserID string, role domain.BoardRole) error {

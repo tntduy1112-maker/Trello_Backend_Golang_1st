@@ -43,7 +43,15 @@ func (r BoardRole) CanEdit() bool {
 	return r.HasPermission(BoardRoleMember)
 }
 
+func (r BoardRole) CanEditLists() bool {
+	return r.HasPermission(BoardRoleAdmin)
+}
+
 func (r BoardRole) CanManage() bool {
+	return r.HasPermission(BoardRoleAdmin)
+}
+
+func (r BoardRole) CanInvite() bool {
 	return r.HasPermission(BoardRoleAdmin)
 }
 
