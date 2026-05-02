@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Kanban, Bell, Search, Plus, User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { Kanban, Bell, Search, Plus, User, LogOut, Settings, ChevronDown, HelpCircle } from 'lucide-react';
 import { logout } from '../../redux/slices/authSlice';
 import NotificationDropdown from '../ui/NotificationDropdown';
+import HelpModal from '../ui/HelpModal';
 
 export default function Navbar() {
   const dispatch = useDispatch();
@@ -13,6 +14,7 @@ export default function Navbar() {
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const userMenuRef = useRef(null);
@@ -83,6 +85,15 @@ export default function Navbar() {
           {showNotifications && <NotificationDropdown onClose={() => setShowNotifications(false)} />}
         </div>
 
+        {/* Help */}
+        <button
+          onClick={() => setShowHelp(true)}
+          className="p-2 text-white hover:bg-white/20 rounded"
+          title="Help"
+        >
+          <HelpCircle className="w-5 h-5" />
+        </button>
+
         {/* User menu */}
         <div className="relative" ref={userMenuRef}>
           <button
@@ -124,6 +135,8 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </nav>
   );
 }
