@@ -14,10 +14,10 @@ TaskFlow is a collaborative project management application inspired by Trello. I
 
 | Feature | Description |
 |---------|-------------|
-| **Register** | Create a new account with email and password |
 | **Login** | Sign in with email and password |
 | **JWT Authentication** | Secure token-based authentication with auto-refresh |
 | **Logout** | Sign out and clear session |
+| **Invitation-Only Registration** | New users can only join via workspace/board invitations |
 
 ### 2. Workspaces (Organizations)
 
@@ -135,10 +135,10 @@ TaskFlow is a collaborative project management application inspired by Trello. I
 
 ### Getting Started
 
-1. **Create an Account**
-   - Go to the registration page
-   - Enter your full name, email, and password
-   - Click "Register" to create your account
+1. **Join via Invitation**
+   - Receive an invitation email from your team
+   - Click the invitation link to set up your account
+   - Enter your details and create a password
 
 2. **Create Your First Workspace**
    - After login, click "Create Workspace"
@@ -254,8 +254,8 @@ Base URL: `/api/v1`
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/auth/register` | POST | Create account |
 | `/auth/login` | POST | Login |
+| `/invitations/accept` | POST | Accept invitation and create account |
 | `/workspaces` | GET/POST | List/Create workspaces |
 | `/boards` | GET/POST | List/Create boards |
 | `/boards/:id` | GET/PATCH/DELETE | Board operations |
@@ -287,3 +287,4 @@ If you encounter any issues or have questions:
 - Organization: Labels, Checklists, Attachments
 - Real-time: Notifications via SSE
 - Activity tracking and audit log
+- Invitation-only user registration (no public signup)

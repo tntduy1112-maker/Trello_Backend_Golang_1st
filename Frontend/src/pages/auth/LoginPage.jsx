@@ -82,15 +82,6 @@ export default function LoginPage() {
           Forgot password?
         </Link>
       </div>
-
-      <hr className="my-6" />
-
-      <p className="text-center text-sm text-gray-600">
-        Don&apos;t have an account?{' '}
-        <Link to="/register" className="link">
-          Sign up
-        </Link>
-      </p>
     </div>
   );
 }
