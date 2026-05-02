@@ -1,302 +1,415 @@
-# AI Agent Project — Production-Grade Configuration
+# TaskFlow — Trello-Style Kanban Board
 
 <div align="center">
   <img src="https://res.cloudinary.com/ecommerce2021/image/upload/v1768626951/dev_efjbzw.jpg" alt="Code Web Khong Kho" width="120" style="border-radius: 50%"/>
 
-  <h3>Production-ready AI Agent configuration for Claude Code</h3>
-  <p>Structured workflows, specialized agents, mandatory rules, and best practices</p>
+  <h3>Full-Stack Kanban Board Application</h3>
+  <p>Built with Go + React | Multi-tenant Workspaces | Real-time Collaboration</p>
 
-  ![Version](https://img.shields.io/badge/version-1.2.0-blue?style=flat-square)
+  ![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)
+  ![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
+  ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+  ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+
   [![Facebook](https://img.shields.io/badge/Facebook-Code%20Web%20Khong%20Kho-1877F2?logo=facebook)](https://www.facebook.com/codewebkhongkho)
   [![TikTok](https://img.shields.io/badge/TikTok-@code.web.khng.kh-000000?logo=tiktok)](https://www.tiktok.com/@code.web.khng.kh)
   [![Website](https://img.shields.io/badge/Website-codewebkhongkho.com-FF6B35?logo=google-chrome)](https://codewebkhongkho.com/portfolios)
-
-  <sub>Inspired by <a href="https://github.com/addyosmani/agent-skills">addyosmani/agent-skills</a></sub>
 </div>
 
 ---
 
 ## Overview
 
-This repository provides a **production-grade configuration** for Claude Code AI agents. It includes:
+**TaskFlow** is a collaborative project management application inspired by Trello. It enables teams to organize work using boards, lists, and cards with real-time collaboration features.
 
-- **Structured development workflow** (Spec → Plan → Build → Test → Review → Ship)
-- **10 specialized agents** for different development roles
-- **13 mandatory rules** covering code quality, architecture, and operations
-- **8 slash commands** for common workflows
-- **4 reference checklists** for security, testing, performance, and accessibility
+### Key Features
+
+- **Multi-tenant Workspaces** — Organize teams and projects
+- **Kanban Boards** — Visual project management with drag & drop
+- **Real-time Collaboration** — Instant updates via Server-Sent Events (SSE)
+- **Role-based Access** — Owner, Admin, Member, Viewer permissions
+- **Rich Card Details** — Labels, checklists, attachments, comments, due dates
+- **Activity Tracking** — Full audit log of all actions
+- **Invitation System** — Secure team onboarding via email invitations
 
 ---
 
-## Development Workflow
+## Tech Stack
+
+### Backend (Go)
+
+| Technology | Purpose |
+|------------|---------|
+| **Go 1.25** | Runtime |
+| **Gin** | HTTP framework |
+| **pgx/v5** | PostgreSQL driver |
+| **go-redis** | Redis client |
+| **minio-go** | Object storage |
+| **golang-jwt** | JWT authentication |
+| **zerolog** | Structured logging |
+| **validator/v10** | Request validation |
+
+### Frontend (React)
+
+| Technology | Purpose |
+|------------|---------|
+| **React 18** | UI framework |
+| **Vite** | Build tool |
+| **Redux Toolkit** | State management |
+| **React Router v7** | Routing |
+| **@dnd-kit** | Drag & drop |
+| **Tailwind CSS** | Styling |
+| **Axios** | HTTP client |
+| **Lucide React** | Icons |
+
+### Infrastructure
+
+| Technology | Purpose |
+|------------|---------|
+| **PostgreSQL 16** | Primary database |
+| **Redis** | Cache, rate limiting, SSE tracking |
+| **MinIO** | S3-compatible file storage |
+| **Docker** | Containerization |
+
+---
+
+## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                                                                  │
-│   /spec  →  /plan  →  /build  →  /test  →  /review  →  /deploy  │
-│                                                                  │
-│   Define    Plan     Build     Verify    Review      Ship        │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Browser (React SPA :5173)                    │
+│               REST/JSON + SSE (Real-time Events)                │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     Go API Server (:8080)                       │
+├─────────────────────────────────────────────────────────────────┤
+│  Middleware: CORS | JWT Auth | Rate Limit | Error Handler       │
+├─────────────────────────────────────────────────────────────────┤
+│  12 Modules: Auth | Organizations | Boards | Lists | Cards      │
+│              Labels | Comments | Checklists | Attachments        │
+│              Activity | Notifications | Invitations             │
+├─────────────────────────────────────────────────────────────────┤
+│  Architecture: Handler → Service → Repository                   │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+┌──────────────┐       ┌──────────────┐       ┌──────────────┐
+│ PostgreSQL   │       │    Redis     │       │    MinIO     │
+│   (Data)     │       │   (Cache)    │       │   (Files)    │
+└──────────────┘       └──────────────┘       └──────────────┘
 ```
 
-| Phase | Command | Description |
-|-------|---------|-------------|
-| **Define** | `/spec` | Create PRD with objectives, scope, and boundaries |
-| **Plan** | `/plan` | Decompose into vertical slices with acceptance criteria |
-| **Build** | `/build` | Implement incrementally using TDD |
-| **Verify** | `/test` | Write tests with RED-GREEN-REFACTOR |
-| **Review** | `/review` | Five-axis code review |
-| **Ship** | `/deploy` | Build, test, and deploy |
+---
 
-### Supporting Commands
+## Data Model
 
-| Command | Description |
-|---------|-------------|
-| `/debug` | Systematic error diagnosis |
-| `/simplify` | Reduce code complexity |
-| `/fix-issue` | Analyze and fix issues |
+```
+Users
+└── Organizations (Workspaces)
+    ├── organization_members (owner | admin | member)
+    └── Boards
+        ├── board_members (owner | admin | member | viewer)
+        ├── board_invitations
+        ├── Labels
+        └── Lists
+            └── Cards
+                ├── card_labels
+                ├── Checklists → checklist_items
+                ├── Comments
+                ├── Attachments (MinIO)
+                └── Activity Logs
+└── Notifications (SSE real-time)
+```
+
+---
+
+## Implemented Features
+
+### Authentication & Security
+- [x] JWT access token (15 min) + refresh token (7 days)
+- [x] Token rotation with reuse detection
+- [x] Redis-based rate limiting
+- [x] Password hashing (bcrypt)
+- [x] Email verification (OTP)
+- [x] Forgot/reset password flow
+
+### Workspaces & Boards
+- [x] Multi-tenant workspaces with unique slugs
+- [x] Board creation with background colors
+- [x] Board visibility (private/workspace/public)
+- [x] 4-level permission system
+- [x] Email invitation flow
+
+### Lists & Cards
+- [x] CRUD operations
+- [x] Drag & drop reordering (@dnd-kit)
+- [x] Float-based positioning (O(1) insert)
+- [x] Archive/restore functionality
+
+### Card Features
+- [x] Rich text description
+- [x] Due dates with date picker
+- [x] Priority levels (none/low/medium/high)
+- [x] Single assignee
+- [x] Completion status
+- [x] Cover image from attachments
+
+### Labels & Organization
+- [x] Custom colored labels per board
+- [x] Multiple labels per card
+- [x] Color picker UI
+
+### Checklists
+- [x] Multiple checklists per card
+- [x] Checklist items with progress bar
+- [x] Check/uncheck functionality
+
+### Comments & Collaboration
+- [x] Threaded comments (1-level)
+- [x] @mentions with notification
+- [x] Edit/delete own comments
+
+### Attachments
+- [x] File upload to MinIO
+- [x] Image preview
+- [x] Set as card cover
+- [x] Download functionality
+
+### Real-time & Notifications
+- [x] Server-Sent Events (SSE)
+- [x] Notification bell with unread count
+- [x] Mark as read (single/all)
+- [x] Click to navigate
+
+### Activity Tracking
+- [x] Card-level activity feed
+- [x] Board-level activity log
+- [x] JSONB metadata storage
+
+---
+
+## API Endpoints (84 Total)
+
+| Module | Endpoints | Route Prefix |
+|--------|:---------:|--------------|
+| Auth | 10 | `/api/v1/auth` |
+| Organizations | 11 | `/api/v1/organizations` |
+| Boards | 12 | `/api/v1/boards` |
+| Lists | 6 | `/api/v1/lists` |
+| Cards | 14 | `/api/v1/cards` |
+| Labels | 5 | `/api/v1/labels` |
+| Comments | 3 | `/api/v1/comments` |
+| Checklists | 7 | `/api/v1/checklists` |
+| Checklist Items | 3 | `/api/v1/checklist-items` |
+| Attachments | 4 | `/api/v1/attachments` |
+| Notifications | 6 | `/api/v1/notifications` |
+| Invitations | 4 | `/api/v1/invitations` |
+
+**API Documentation:** `http://localhost:8080/api/docs`
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Go 1.25+
+- Node.js 20+
+- Docker & Docker Compose
+- PostgreSQL 16
+- Redis 7
+- MinIO
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/tntduy1112-maker/Trello_Backend_Golang_1st.git
+cd Trello_Backend_Golang_1st
+```
+
+### 2. Start Infrastructure
+
+```bash
+docker-compose up -d postgres redis minio
+```
+
+### 3. Backend Setup
+
+```bash
+cd Backend
+
+# Copy environment file
+cp .env.example .env
+
+# Run migrations
+goose -dir migrations postgres "postgres://postgres:secret@localhost:5432/taskflow?sslmode=disable" up
+
+# Start server (with hot reload)
+air
+
+# Or without hot reload
+go run cmd/server/main.go
+```
+
+### 4. Frontend Setup
+
+```bash
+cd Frontend
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+```
+
+### 5. Access Application
+
+- **Frontend:** http://localhost:5173
+- **Backend API:** http://localhost:8080/api/v1
+- **API Docs:** http://localhost:8080/api/docs
+- **MinIO Console:** http://localhost:9001
+
+---
+
+## Environment Variables
+
+### Backend (.env)
+
+```bash
+# App
+APP_ENV=development
+APP_PORT=8080
+FRONTEND_URL=http://localhost:5173
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=taskflow
+DB_USER=postgres
+DB_PASSWORD=secret
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# JWT
+JWT_ACCESS_SECRET=your-access-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=168h
+
+# MinIO
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=taskflow
+
+# SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+```
+
+### Frontend (.env)
+
+```bash
+VITE_API_URL=http://localhost:8080/api/v1
+```
 
 ---
 
 ## Project Structure
 
 ```
-.claude/
-├── CLAUDE.md                    # Main AI configuration
+.
+├── Backend/
+│   ├── cmd/server/          # Entry point
+│   ├── internal/
+│   │   ├── config/          # Configuration
+│   │   ├── domain/          # Entity models
+│   │   ├── dto/             # Request/Response DTOs
+│   │   ├── handler/         # HTTP handlers
+│   │   ├── middleware/      # Auth, rate limit, error
+│   │   ├── repository/      # Data access layer
+│   │   └── service/         # Business logic
+│   ├── pkg/                 # Reusable packages
+│   ├── migrations/          # SQL migrations (Goose)
+│   └── docs/                # Swagger/OpenAPI
 │
-├── commands/                    # Slash commands (8 total)
-│   ├── spec.md                  # /spec — PRD creation
-│   ├── plan.md                  # /plan — Task breakdown
-│   ├── build.md                 # /build — Incremental implementation
-│   ├── test.md                  # /test — TDD workflow
-│   ├── review.md                # /review — Code review
-│   ├── deploy.md                # /deploy — Deployment
-│   ├── debug.md                 # /debug — Error diagnosis
-│   ├── simplify.md              # /simplify — Code simplification
-│   └── fix-issue.md             # /fix-issue — Issue resolution
+├── Frontend/
+│   ├── src/
+│   │   ├── api/             # Axios instance
+│   │   ├── components/      # UI components
+│   │   ├── hooks/           # Custom hooks
+│   │   ├── pages/           # Route pages
+│   │   ├── redux/           # Store & slices
+│   │   ├── services/        # API services
+│   │   └── utils/           # Helpers
+│   └── public/
 │
-├── agents/                      # Specialized agents (10 total)
-│   ├── frontend.md              # Frontend Developer
-│   ├── backend.md               # Backend Developer
-│   ├── systems-architect.md     # Systems Architect
-│   ├── code-reviewer.md         # Code Reviewer
-│   ├── test-engineer.md         # Test Engineer
-│   ├── security-auditor.md      # Security Auditor
-│   ├── qa.md                    # QA Engineer
-│   ├── project-manager.md       # Project Manager
-│   ├── ui-ux-designer.md        # UI/UX Designer
-│   └── copywriter-seo.md        # Copywriter/SEO
+├── PLANS/                   # Project documentation
+│   ├── PROJECT_DESCRIPTION.md
+│   ├── BACKEND_DESCRIPTION.md
+│   ├── FRONTEND_DESCRIPTION.md
+│   ├── DATABASE_DESIGN.md
+│   ├── AUTH_FLOW.md
+│   ├── API_SPEC.md
+│   └── DELIVERY_NOTE.md
 │
-├── rules/                       # Mandatory rules (13 total)
-│   ├── clean-code.md            # Clean Code principles
-│   ├── code-style.md            # Formatting & naming
-│   ├── error-handling.md        # Error patterns
-│   ├── tech-stack.md            # Approved technologies
-│   ├── system-design.md         # System design patterns
-│   ├── project-structure.md     # Folder organization
-│   ├── api-conventions.md       # REST API standards
-│   ├── naming-conventions.md    # Naming patterns
-│   ├── database.md              # Database patterns
-│   ├── security.md              # Security requirements
-│   ├── monitoring.md            # Observability
-│   ├── testing.md               # Test standards
-│   └── git-workflow.md          # Git conventions
-│
-├── skills/                      # Advanced skills
-│   ├── tdd/SKILL.md             # Test-Driven Development
-│   ├── code-review/SKILL.md     # Five-axis review
-│   ├── incremental-implementation/SKILL.md
-│   ├── deploy/SKILL.md
-│   └── security-review/SKILL.md
-│
-├── references/                  # Quick checklists
-│   ├── security-checklist.md
-│   ├── testing-patterns.md
-│   ├── performance-checklist.md
-│   └── accessibility-checklist.md
-│
-└── settings.json                # Project settings
+└── .claude/                 # AI Agent configuration
+    ├── CLAUDE.md
+    ├── commands/
+    ├── agents/
+    ├── rules/
+    └── skills/
 ```
 
 ---
 
-## Specialized Agents
+## Documentation
 
-### Development Agents
-
-| Agent | Role | Invoke When |
-|-------|------|-------------|
-| **Frontend Developer** | Next.js, React, TypeScript, UI | Components, pages, state |
-| **Backend Developer** | Express, Prisma, Redis, BullMQ | APIs, services, jobs |
-| **Systems Architect** | Architecture, ADRs, scaling | System design decisions |
-
-### Quality Agents
-
-| Agent | Role | Invoke When |
-|-------|------|-------------|
-| **Code Reviewer** | Five-axis code review | PR reviews, quality checks |
-| **Test Engineer** | TDD, coverage, test strategy | Writing and reviewing tests |
-| **Security Auditor** | Vulnerability, threat modeling | Security reviews |
-| **QA Engineer** | Test plans, E2E, bug reports | Quality assurance |
-
-### Product Agents
-
-| Agent | Role | Invoke When |
-|-------|------|-------------|
-| **Project Manager** | Stories, sprints, planning | Project planning |
-| **UI/UX Designer** | Design system, accessibility | UX decisions |
-| **Copywriter/SEO** | Copy, meta tags, SEO | Content creation |
+| Document | Description |
+|----------|-------------|
+| [PROJECT_DESCRIPTION.md](PLANS/PROJECT_DESCRIPTION.md) | Project overview & tech decisions |
+| [BACKEND_DESCRIPTION.md](PLANS/BACKEND_DESCRIPTION.md) | Go backend architecture |
+| [FRONTEND_DESCRIPTION.md](PLANS/FRONTEND_DESCRIPTION.md) | React frontend structure |
+| [DATABASE_DESIGN.md](PLANS/DATABASE_DESIGN.md) | PostgreSQL schema (19 tables) |
+| [AUTH_FLOW.md](PLANS/AUTH_FLOW.md) | JWT authentication flow |
+| [API_SPEC.md](PLANS/API_SPEC.md) | OpenAPI specification |
+| [DELIVERY_NOTE.md](PLANS/DELIVERY_NOTE.md) | User guide & feature list |
 
 ---
 
-## Approved Tech Stack
+## Development Workflow
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend (SEO)** | Next.js 14 (App Router) |
-| **Frontend (Admin)** | React + Vite |
-| **Styling** | Tailwind CSS + shadcn/ui |
-| **State** | Zustand + TanStack Query |
-| **Backend** | Express.js + TypeScript |
-| **ORM** | Prisma |
-| **Database** | PostgreSQL |
-| **Cache** | Redis (ioredis) |
-| **Queue** | BullMQ (simple) / RabbitMQ (enterprise) |
-| **Auth** | NextAuth.js / JWT + bcrypt |
-| **Testing** | Vitest + Playwright |
-| **Monitoring** | Prometheus + Grafana + Pino |
-| **CI/CD** | GitHub Actions |
-| **Deploy** | Vercel + Railway/Fly.io |
-
----
-
-## Mandatory Rules
-
-All 13 rules in `.claude/rules/` must be followed:
-
-### Code Quality
-- **clean-code.md** — Variables, functions, SOLID, async/await
-- **code-style.md** — 2-space indent, single quotes, semicolons
-- **error-handling.md** — AppError class, centralized handler
-
-### Architecture
-- **tech-stack.md** — Approved technologies only
-- **system-design.md** — CAP, caching, scaling patterns
-- **project-structure.md** — Layered architecture
-- **api-conventions.md** — REST standards, response envelopes
-
-### Data & Naming
-- **naming-conventions.md** — Cache keys, DB, queues, env vars
-- **database.md** — Prisma patterns, N+1 prevention
-
-### Operations
-- **security.md** — **CRITICAL** — Never violate
-- **monitoring.md** — Prometheus, Grafana, alerting
-- **testing.md** — 80% coverage minimum
-- **git-workflow.md** — Conventional commits
-
----
-
-## Quick Start
-
-```bash
-# Clone repository
-git clone <repo-url>
-cd ai-agent
-
-# Copy to your project
-cp -r .claude/ /path/to/your/project/
-
-# Or use as template
-```
-
-### Using Commands
-
-```bash
-# In Claude Code, use slash commands:
-/spec "User authentication feature"
-/plan
-/build
-/test
-/review
-/deploy
-```
-
-### Using Agents
+This project uses Claude AI agents with structured workflows:
 
 ```
-"Act as the Frontend Developer and build the login page"
-"As Systems Architect, design the notification system"
-"Code Reviewer: review this PR for security issues"
-"Test Engineer: write tests for the payment flow"
+/spec  →  /plan  →  /build  →  /test  →  /review  →  /deploy
 ```
 
----
-
-## Key Concepts
-
-### Five-Axis Code Review
-
-Every code review evaluates:
-
-1. **Correctness** — Does it work? Edge cases?
-2. **Readability** — Can others understand it?
-3. **Architecture** — Follows patterns? Appropriate abstractions?
-4. **Security** — Input validation? Auth? No secrets?
-5. **Performance** — N+1? Pagination? Async?
-
-### Test-Driven Development
-
-```
-RED    → Write failing test
-GREEN  → Write minimal code to pass
-REFACTOR → Improve while green
-```
-
-### Vertical Slicing
-
-Build features end-to-end, not layer-by-layer:
-
-```
-✅ Task 1: User can create task (DB + API + UI)
-✅ Task 2: User can view tasks (DB + API + UI)
-
-❌ Task 1: Create all DB models
-❌ Task 2: Create all API routes
-```
-
----
-
-## Security
-
-**Never commit:**
-- `.env` files
-- API keys, secrets, passwords
-- `.claude/settings.local.json`
-
-**Always:**
-- Use environment variables
-- Validate all inputs
-- Hash passwords (bcrypt >= 12 rounds)
-- Parameterize queries
+See [.claude/CLAUDE.md](.claude/CLAUDE.md) for AI agent configuration.
 
 ---
 
 ## Contributing
 
-1. Follow the development workflow (`/spec` → `/plan` → `/build`)
+1. Follow the development workflow
 2. Ensure all tests pass
-3. Run `/review` before submitting PR
-4. Follow conventional commit format
+3. Follow conventional commit format
+4. Run code review before submitting PR
 
 ---
 
-## Credits
+## License
 
-- Workflow inspired by [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
-- Best practices from *Software Engineering at Google*
-- Clean Code principles from Robert C. Martin
+MIT
 
 ---
 
