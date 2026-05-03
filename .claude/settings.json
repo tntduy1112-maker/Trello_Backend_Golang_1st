@@ -5,10 +5,19 @@
     "allow_file_read": true,
     "allow_file_write": true,
     "allow_shell_commands": true,
-    "allow_web_search": true
+    "allow_web_search": true,
+    "allow": [
+      "Bash(rtk *)"
+    ]
   },
   "rules_dir": ".claude/rules",
   "commands_dir": ".claude/commands",
   "skills_dir": ".claude/skills",
-  "agents_dir": ".claude/agents"
+  "agents_dir": ".claude/agents",
+  "hooks": {
+    "Bash": {
+      "command": "rtk rewrite",
+      "timeout": 5000
+    }
+  }
 }
